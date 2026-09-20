@@ -11,7 +11,7 @@ export function FlowField({ density = "sparse" }: { density?: "sparse" | "medium
     let height = 0;
     let time = 0;
     const count = density === "medium" ? 700 : 350;
-    const particles = Array.from({ length: count }, () => ({ x: Math.random(), y: Math.random(), life: Math.random() * 200, speed: 0.0006 + Math.random() * 0.0015, hue: 165 + Math.random() * 90 }));
+    const particles = Array.from({ length: count }, () => ({ x: Math.random(), y: Math.random(), life: Math.random() * 200, speed: 0.0006 + Math.random() * 0.0015, hue: 285 + Math.random() * 75 }));
     const resize = () => {
       width = window.innerWidth;
       height = window.innerHeight;
@@ -24,7 +24,7 @@ export function FlowField({ density = "sparse" }: { density?: "sparse" | "medium
     };
     const render = () => {
       time += 1;
-      context.fillStyle = "rgba(5, 12, 18, .16)";
+      context.fillStyle = "rgba(14, 6, 24, .12)";
       context.fillRect(0, 0, width, height);
       for (const particle of particles) {
         const px = particle.x * width;
@@ -39,7 +39,7 @@ export function FlowField({ density = "sparse" }: { density?: "sparse" | "medium
           particle.life = 0;
         }
         const alpha = Math.min(particle.life / 25, 1) * Math.min((240 - particle.life) / 35, 1) * 0.42;
-        context.fillStyle = `hsla(${particle.hue}, 82%, 66%, ${Math.max(alpha, 0)})`;
+        context.fillStyle = `hsla(${particle.hue}, 88%, 74%, ${Math.max(alpha, 0) * 1.25})`;
         context.fillRect(particle.x * width, particle.y * height, 1.4, 1.4);
       }
       animation = requestAnimationFrame(render);
