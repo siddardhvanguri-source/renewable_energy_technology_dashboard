@@ -11,7 +11,7 @@ export function FlowField({ density = "sparse" }: { density?: "sparse" | "medium
     let height = 0;
     let time = 0;
     const count = density === "medium" ? 700 : 350;
-    const particles = Array.from({ length: count }, () => ({ x: Math.random(), y: Math.random(), life: Math.random() * 200, speed: 0.0006 + Math.random() * 0.0015, hue: Math.random() > 0.52 ? 24 + Math.random() * 28 : 185 + Math.random() * 35 }));
+    const particles = Array.from({ length: count }, () => ({ x: Math.random(), y: Math.random(), life: Math.random() * 200, speed: 0.0006 + Math.random() * 0.0015, hue: 195 + Math.random() * 35 }));
     const resize = () => {
       width = window.innerWidth;
       height = window.innerHeight;
