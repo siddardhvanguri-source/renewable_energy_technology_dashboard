@@ -12,7 +12,7 @@ export function LiveStatusBar({ connection, updatedAt, efficiency, power }: Live
   const isOffline = connection === "DISCONNECTED" || connection === "ERROR";
   const age = Math.max(0, Math.round((Date.now() - updatedAt) / 1000));
   const alert = isOffline ? "Connection lost" : efficiency < 95 ? "Low efficiency" : null;
-  const mode = isLive ? "LIVE" : isOffline ? "OFFLINE" : "DEMO";
+  const mode = isLive ? "LIVE" : isOffline ? "OFFLINE" : connection === "CONNECTING" ? "WAITING" : "DEMO";
   return <section className={`live-status-bar ${isOffline ? "offline" : ""}`} aria-label="Live system status">
     <div className="live-status-item status-mode"><span className="status-icon">{isOffline ? <WifiOff size={16} /> : <Wifi size={16} />}</span><div><small>MODE</small><strong>{mode}</strong></div></div>
     <div className="live-status-item"><Clock3 size={16} /><div><small>LAST UPDATE</small><strong>{age < 2 ? "Just now" : `${age}s ago`}</strong></div></div>
