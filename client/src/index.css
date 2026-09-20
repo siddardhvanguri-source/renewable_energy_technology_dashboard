@@ -288,3 +288,19 @@ label > span { font-size: var(--type-sm); }
 @keyframes azure-rise { from { opacity: 0; transform: translateY(21px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes azure-pulse { 0%, 100% { opacity: .72; } 61.8% { opacity: 1; } }
 @keyframes azure-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Live status bar */
+.live-status-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; align-items: center; gap: var(--fib-2); margin: 0 0 var(--fib-3); padding: var(--fib-2) var(--fib-3); border: 1px solid rgba(157,190,235,.32); border-radius: var(--radius); background: linear-gradient(100deg, rgba(18,48,80,.88), rgba(40,73,108,.62)); box-shadow: inset 0 1px 0 rgba(228,238,248,.08), 0 0 24px rgba(82,125,235,.12); }
+.live-status-item { min-width: 0; display: flex; align-items: center; gap: var(--fib-1); padding-right: var(--fib-2); border-right: 1px solid rgba(157,190,235,.22); color: #9dbceb; }
+.live-status-item svg { flex: none; color: #9dbceb; filter: drop-shadow(0 0 6px rgba(157,190,235,.5)); }
+.live-status-item div { min-width: 0; }
+.live-status-item small { display: block; color: #b8d2f1; font-size: var(--type-xs); letter-spacing: .1em; }
+.live-status-item strong { display: block; overflow: hidden; margin-top: 2px; color: #e4eef8; font-size: var(--type-sm); white-space: nowrap; text-overflow: ellipsis; }
+.live-status-item.status-mode strong { color: #9dbceb; }
+.live-alert { display: inline-flex; align-items: center; justify-content: center; gap: var(--fib-1); min-height: 34px; padding: 0 var(--fib-2); border: 1px solid rgba(157,190,235,.34); border-radius: 999px; color: #e4eef8; background: rgba(157,190,235,.1); font-size: var(--type-sm); white-space: nowrap; }
+.live-alert.ok svg { color: #9dbceb; }
+.live-alert.warning { border-color: rgba(217,109,130,.55); color: #ffdce3; background: rgba(217,109,130,.12); }
+.live-alert.warning svg { color: #d96d82; }
+.live-status-bar.offline { border-color: rgba(217,109,130,.5); background: linear-gradient(100deg, rgba(64,27,47,.9), rgba(38,25,54,.75)); }
+@media (max-width: 900px) { .live-status-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .live-alert { grid-column: span 2; justify-self: start; } }
+@media (max-width: 520px) { .live-status-bar { gap: var(--fib-1); padding: var(--fib-2); } .live-status-item { padding-right: var(--fib-1); } .live-status-item small { font-size: 9px; } .live-status-item strong { font-size: 12px; } .live-alert { width: 100%; font-size: 12px; } }
