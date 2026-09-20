@@ -4,7 +4,6 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createCommand, ensureDevice, getSettings, insertTelemetry, listCommands, listScenarios, listTelemetry, saveSettings } from "./db";
-import { getSimulationStatus, readSimulationRows } from "./simulation";
 
 const deviceKeySchema = z.string().min(1).max(64).default("array-a");
 
@@ -33,10 +32,6 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
-  }),
-  simulation: router({
-    status: publicProcedure.query(() => getSimulationStatus()),
-    latest: publicProcedure.input(z.object({ limit: z.number().int().min(1).max(600).default(60) })).query(({ input }) => readSimulationRows(input.limit)),
   }),
   dashboard: router({
     snapshot: publicProcedure.input(z.object({ deviceKey: deviceKeySchema })).query(async ({ input }) => {
