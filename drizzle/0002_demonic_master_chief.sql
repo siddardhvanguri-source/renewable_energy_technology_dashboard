@@ -1,0 +1,1 @@
+ALTER TABLE `telemetrySamples` ADD `source` enum('DEMO','MATLAB','ESP32') DEFAULT 'DEMO' NOT NULL;

@@ -52,6 +52,7 @@ export const telemetrySamples = mysqlTable(
     iPh: double("iPh").notNull(),
     duty: double("duty").notNull(),
     efficiency: double("efficiency").notNull().default(96.8),
+    source: mysqlEnum("source", ["DEMO", "MATLAB", "ESP32"]).notNull().default("DEMO"),
     scenarioCode: varchar("scenarioCode", { length: 16 }).notNull().default("S5"),
   },
   (table) => [

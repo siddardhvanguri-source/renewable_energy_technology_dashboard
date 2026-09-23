@@ -53,6 +53,7 @@ export const appRouter = router({
           iPh: frame.iPh,
           duty: frame.duty,
           efficiency: frame.efficiency,
+          source: "DEMO",
           scenarioCode: "S5",
         })));
         history = await listTelemetry(device.id);
@@ -89,6 +90,7 @@ export const appRouter = router({
         iPh: input.i_ph,
         duty: input.duty,
         efficiency: input.efficiency ?? 96.8,
+        source: "ESP32",
         scenarioCode: input.scenarioCode,
       });
       return { accepted: Boolean(saved), sample: saved };

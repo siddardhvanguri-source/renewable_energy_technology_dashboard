@@ -18,6 +18,7 @@ export default function Home() {
   const ingestMutation = trpc.dashboard.ingest.useMutation();
   const commandMutation = trpc.dashboard.command.useMutation({ onSuccess: ({ accepted }) => accepted ? toast.success("Command queued in controller history") : toast.error("Command could not be queued") });
   const [telemetry, setTelemetry] = useState<Frame[]>([]);
+  const [matlabTelemetry, setMatlabTelemetry] = useState<Frame[]>([]);
   const [connection, setConnection] = useState<"LIVE" | "DEMO / MOCK" | "CONNECTING" | "DISCONNECTED" | "ERROR">("DEMO / MOCK");
   const [stopped, setStopped] = useState(false);
   const [notice, setNotice] = useState("Demo data is running");
@@ -27,7 +28,34 @@ export default function Home() {
 
   useEffect(() => { if (snapshot?.history?.length) setTelemetry(snapshot.history.map(normalize)); }, [snapshot?.history]);
   useEffect(() => { if (!telemetry.length) setTelemetry([demoFrame(Date.now() - 33_000), ...Array.from({ length: 33 }, (_, index) => demoFrame(Date.now() - (32 - index) * 1000))]); }, [telemetry.length]);
-  useEffect(() => { if (stopped) return; const timer = window.setInterval(() => setTelemetry((items) => [...items.slice(-59), demoFrame()]), 1100); return () => window.clearInterval(timer); }, [stopped]);
+  useEffect(() => { if (stopped || connection !== "DEMO / MOCK") return; const timer = window.setInterval(() => setTelemetry((items) => [...items.slice(-59), demoFrame()]), 1100); return () => window.clearInterval(timer); }, [stopped, connection]);
+  useEffect(() => {
+    let closed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let socket: WebSocket | null = null;
+    const connect = () => {
+      if (closed) return;
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      try {
+        socket = new WebSocket(`${protocol}//${window.location.host}/ws/matlab`);
+        socket.onmessage = (event) => {
+          try {
+            const next = JSON.parse(event.data);
+            if (next.source === "MATLAB" && typeof next.p_pv === "number") {
+              setMatlabTelemetry((items) => [...items.slice(-59), normalize(next)]);
+            }
+          } catch {
+            // Ignore connection envelopes and malformed frames.
+          }
+        };
+        socket.onclose = () => { if (!closed) reconnectTimer = setTimeout(connect, 5000); };
+      } catch {
+        if (!closed) reconnectTimer = setTimeout(connect, 5000);
+      }
+    };
+    connect();
+    return () => { closed = true; if (reconnectTimer) clearTimeout(reconnectTimer); socket?.close(); };
+  }, []);
   useEffect(() => () => socketRef.current?.close(), []);
 
   const current = telemetry[telemetry.length - 1] ?? demoFrame();
@@ -52,7 +80,7 @@ export default function Home() {
       { label: "I_ph", value: current.iPh.toFixed(2), unit: "A", detail: "photo current", Icon: Sun },
     ].map(({ label, value, unit, detail, Icon }, index) => <LiquidGlassCard key={label} className={`telemetry-chip tone-${index}`}><Icon size={16} /><div><small>{label}</small><strong>{value}<em>{unit}</em></strong><span>{detail}</span></div></LiquidGlassCard>)}</section>
     <div className="notice-bar"><Terminal size={13} /><span>{notice}</span><span className="notice-spacer" /><span className="micro-label">LIVE ESP32</span><span className="status-dot" /></div>
-    <section className="chart-section"><div className="section-label">LIVE / REFERENCE COMPARISON <i /></div><div className="chart-grid primary"><EkfPoChart telemetry={telemetry} /><RippleChart telemetry={telemetry} /></div><div className="chart-grid secondary"><PvCurveChart /><EfficiencyChart efficiency={current.efficiency} /><DutyChart duty={current.duty} /></div><div className="section-label">REAL-TIME / CONTROLLER RESPONSE <i /></div><div className="chart-grid live"><LiveTelemetryChart telemetry={telemetry} /><ResponseBandChart /></div></section>
+    <section className="chart-section"><div className="section-label">LIVE / REFERENCE COMPARISON <i /></div><div className="chart-grid primary"><EkfPoChart telemetry={telemetry} matlabTelemetry={matlabTelemetry} /><RippleChart telemetry={telemetry} /></div><div className="chart-grid secondary"><PvCurveChart /><EfficiencyChart efficiency={current.efficiency} /><DutyChart duty={current.duty} /></div><div className="section-label">REAL-TIME / CONTROLLER RESPONSE <i /></div><div className="chart-grid live"><LiveTelemetryChart telemetry={telemetry} /><ResponseBandChart /></div></section>
     <footer className="instrument-footer"><span><Cpu size={14} /> ESP32 MPPT · ARRAY A</span><span><CheckCircle2 size={14} /> {snapshot?.history?.length ? "DATABASE HISTORY CONNECTED" : "DEMO HISTORY ACTIVE"}</span><span><HardDrive size={14} /> {telemetry.length} / 60 SAMPLES</span></footer>
     {notificationsOpen ? <div className="notification-drawer"><div className="drawer-head"><div><span>NOTIFICATIONS</span><small>ARRAY A · LIVE SYSTEM</small></div><button onClick={() => setNotificationsOpen(false)} aria-label="Close notifications"><X size={14} /></button></div><div className="notification-summary"><strong>0</strong><span>active alerts</span><i /><strong>2</strong><span>system events</span></div><div className="event-item priority-normal"><span className="event-icon"><CheckCircle2 size={14} /></span><div><strong>MPPT stable</strong><small>ESP32 live power is within the MATLAB reference band.</small></div><time>now</time></div><div className="event-item priority-info"><span className="event-icon"><HardDrive size={14} /></span><div><strong>History synced</strong><small>{snapshot?.history?.length ?? 0} telemetry samples are stored.</small></div><time>live</time></div><div className="event-item priority-info"><span className="event-icon"><Cable size={14} /></span><div><strong>Hardware link ready</strong><small>Connect the ESP32 to replace demo telemetry.</small></div><time>ready</time></div></div> : null}<button className="floating-events" aria-label="Open notifications" onClick={() => setNotificationsOpen((value) => !value)}><Bell size={16} /><span>2</span></button>
   </div>;
