@@ -46,21 +46,21 @@ export function normalize(sample: any): Frame {
 }
 
 /**
- * Generate a single demo frame for fallback display.
+ * Generate a single demo frame for fallback display (10W PV System).
  */
 export function demoFrame(timestampMs = Date.now()): Frame {
   const phase = timestampMs / 1000;
-  const vPv = 31.2 + Math.sin(phase * 0.72) * 0.18;
-  const iPv = 6.92 + Math.cos(phase * 0.58) * 0.06;
+  const vPv = 17.5 + Math.sin(phase * 0.72) * 0.08;
+  const iPv = 0.57 + Math.cos(phase * 0.58) * 0.01;
   return {
     timestampMs,
-    vPv,
-    iPv,
-    pPv: vPv * iPv,
-    vMp: 30.92 + Math.sin(phase * 0.43) * 0.12,
-    iPh: 6.98 + Math.cos(phase * 0.37) * 0.06,
-    duty: 0.61 + Math.sin(phase * 0.29) * 0.014,
-    efficiency: 96.8 + Math.sin(phase * 0.31) * 0.24,
+    vPv: Number(vPv.toFixed(2)),
+    iPv: Number(iPv.toFixed(3)),
+    pPv: Number((vPv * iPv).toFixed(2)),
+    vMp: 17.5,
+    iPh: 0.65,
+    duty: 0.386 + Math.sin(phase * 0.29) * 0.005,
+    efficiency: 99.8 + Math.sin(phase * 0.31) * 0.1,
     source: "DEMO",
   };
 }

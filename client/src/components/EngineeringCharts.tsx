@@ -103,9 +103,9 @@ export function RippleChart({ telemetry }: { telemetry: Sample[] }) {
 }
 
 export function PvCurveChart({ currentV, currentP }: { currentV?: number; currentP?: number }) {
-  const vNominal = currentV && currentV > 0 ? currentV : 31;
-  const pNominal = currentP && currentP > 0 ? currentP : 216;
-  const vOc = vNominal * 1.35;
+  const vNominal = currentV && currentV > 0 ? currentV : 17.5;
+  const pNominal = currentP && currentP > 0 ? currentP : 10.0;
+  const vOc = 21.6;
   const dynamicCurve = Array.from({ length: 12 }, (_, i) => {
     const v = (vOc / 11) * i;
     const p = Math.max(0, pNominal * (1 - Math.pow((v - vNominal) / (vOc - vNominal), 2)));
@@ -219,7 +219,7 @@ export function DutyChart({ duty }: { duty: number }) {
 }
 
 export function ResponseBandChart({ currentP }: { currentP?: number }) {
-  const baseP = currentP && currentP > 0 ? currentP : 216;
+  const baseP = currentP && currentP > 0 ? currentP : 10.0;
   const targetLower = baseP * 0.98;
   const targetUpper = baseP * 1.02;
   const responseData = Array.from({ length: 26 }, (_, i) => ({
