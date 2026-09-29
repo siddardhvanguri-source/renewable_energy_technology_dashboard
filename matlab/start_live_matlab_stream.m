@@ -98,28 +98,38 @@ function start_live_matlab_stream(varargin)
         addpath(defaultAlgDir);
     end
 
-    %% 5. Load Model & Resolve Exact Scenario Input Block Paths
+    %% 5. Load Model & Resolve Scenario Input Block Paths
     load_system(modelName);
 
-    gBlks = find_system(modelName, 'SearchDepth', 1, 'Name', 'G_irr');
-    if isempty(gBlks)
-        gBlks = find_system(modelName, 'Name', 'G_irr');
+    % Search candidates for irradiance block
+    gCandidates = {'G_irr', 'G', 'Irradiance', 'G_irr_table', 'Irr', 'G_in', 'G_test'};
+    gIrrPath = '';
+    for k = 1:numel(gCandidates)
+        b = find_system(modelName, 'SearchDepth', 1, 'Name', gCandidates{k});
+        if isempty(b), b = find_system(modelName, 'Name', gCandidates{k}); end
+        if ~isempty(b), gIrrPath = b{1}; break; end
     end
 
-    tBlks = find_system(modelName, 'SearchDepth', 1, 'Name', 'T_amb');
-    if isempty(tBlks)
-        tBlks = find_system(modelName, 'Name', 'T_amb');
+    % Search candidates for ambient temperature block
+    tCandidates = {'T_amb', 'Tamb', 'Temperature', 'T_amb_table', 'T', 'T_in', 'T_test'};
+    tAmbPath = '';
+    for k = 1:numel(tCandidates)
+        b = find_system(modelName, 'SearchDepth', 1, 'Name', tCandidates{k});
+        if isempty(b), b = find_system(modelName, 'Name', tCandidates{k}); end
+        if ~isempty(b), tAmbPath = b{1}; break; end
     end
 
-    if isempty(gBlks) || isempty(tBlks)
-        error("Scenario input block not found. Could not locate G_irr or T_amb in %s.slx", modelName);
+    if ~isempty(gIrrPath)
+        fprintf('  [OK] Irradiance block  : %s (%s)\n', gIrrPath, get_param(gIrrPath, 'BlockType'));
+    else
+        fprintf('  [INFO] Irradiance dynamic block not found. Using embedded model scenario.\n');
     end
 
-    gIrrPath = gBlks{1};
-    tAmbPath = tBlks{1};
-
-    fprintf('\n  Irradiance block : %s (%s)\n', gIrrPath, get_param(gIrrPath, 'BlockType'));
-    fprintf('  Temperature block: %s (%s)\n\n', tAmbPath, get_param(tAmbPath, 'BlockType'));
+    if ~isempty(tAmbPath)
+        fprintf('  [OK] Temperature block : %s (%s)\n\n', tAmbPath, get_param(tAmbPath, 'BlockType'));
+    else
+        fprintf('  [INFO] Temperature dynamic block not found. Using embedded model scenario.\n\n');
+    end
 
     %% 6. Register Cleanup Handler
     setappdata(0, 'MPPT_LIVE_STREAM_RUNNING', true);
@@ -232,10 +242,10 @@ function start_live_matlab_stream(varargin)
             'SimscapeLogType',           'none');
 
         % Drive scenario inputs into verified block paths if Constant blocks
-        if strcmp(get_param(gIrrPath, 'BlockType'), 'Constant')
+        if ~isempty(gIrrPath) && strcmp(get_param(gIrrPath, 'BlockType'), 'Constant')
             simIn = simIn.setBlockParameter(gIrrPath, 'Value', num2str(G_curr, '%.2f'));
         end
-        if strcmp(get_param(tAmbPath, 'BlockType'), 'Constant')
+        if ~isempty(tAmbPath) && strcmp(get_param(tAmbPath, 'BlockType'), 'Constant')
             simIn = simIn.setBlockParameter(tAmbPath, 'Value', num2str(T_curr, '%.2f'));
         end
 
