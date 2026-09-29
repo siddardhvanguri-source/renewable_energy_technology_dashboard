@@ -16,33 +16,32 @@ graph TD
     subgraph PV_Array["1. PV Physical Generation & Thermal Model"]
         G["Irradiance G(t)"] --> PV["Single-Diode Model"]
         Tamb["Ambient Temp T_amb(t)"] --> Thermal["Cell Thermal Dynamic Balance"]
-        Thermal -->|T_c| PV
-        PV -->|V_pv, I_pv| Sensors["Voltage & Current Measurements"]
+        Thermal -->|"T_c"| PV
+        PV -->|"V_pv, I_pv"| Sensors["Voltage & Current Measurements"]
     end
 
     subgraph Controller["2. Embedded / Simulated Controller"]
-        Sensors -->|V_pv_meas, I_pv_meas| EKF["Extended Kalman Filter (EKF)"]
-        Thermal -->|T_c_meas| EKF
-        Tamb -->|T_amb| EKF
-        EKF -->|V_mp_ref| DutyCtrl["PWM Duty Controller (PI / Direct)"]
-        DutyCtrl -->|Duty D| PWMGen["50 kHz PWM Generator"]
+        Sensors -->|"V_pv, I_pv"| EKF["Extended Kalman Filter (EKF)"]
+        Thermal -->|"T_c"| EKF
+        Tamb -->|"T_amb"| EKF
+        EKF -->|"V_mp_ref"| DutyCtrl["PWM Duty Controller (PI / Direct)"]
+        DutyCtrl -->|"Duty D"| PWMGen["50 kHz PWM Generator"]
     end
 
     subgraph PowerStage["3. 50 kHz DC-DC Boost Converter"]
-        PWMGen -->|Gate Drive| MOSFET["Power MOSFET Switch (Q)"]
-        PV -->|V_pv, I_pv| Inductor["Boost Inductor (L = 1 mH)"]
+        PWMGen -->|"Gate Drive"| MOSFET["Power MOSFET Switch (Q)"]
+        PV -->|"V_pv, I_pv"| Inductor["Boost Inductor (L = 150 µH)"]
         Inductor --> MOSFET
         MOSFET --> Diode["Ultra-Fast Diode (D_boost)"]
-        Diode --> OutCap["Output Capacitor (C_out = 220 µF)"]
-        OutCap --> Load["DC Load / Battery (R_L = 100 Ω)"]
+        Diode --> OutCap["Output Capacitor (C_out = 470 µF)"]
+        OutCap --> Load["DC Load / Battery (12V)"]
     end
 
     subgraph Telemetry["4. Real-Time Telemetry & Web Dashboard"]
-        Sensors & EKF & DutyCtrl & PowerStage --> Log["Simulink logsout Engine"]
-        Log --> Streamer["start_live_matlab_stream (15 Hz)"]
-        Streamer -->|POST /api/telemetry/simulation| NodeAPI["Node.js / Express Server"]
-        NodeAPI -->|SQLite WAL| DB[(telemetry.db)]
-        NodeAPI -->|WebSocket /ws/matlab| ReactUI["React 18 Live Dashboard"]
+        DutyCtrl --> Streamer["master_orchestrator('live') (15 Hz)"]
+        Streamer -->|"POST /api/telemetry/simulation"| NodeAPI["Node.js / Express Server"]
+        NodeAPI -->|"SQLite WAL"| DB[("telemetry.db")]
+        NodeAPI -->|"WebSocket /ws/matlab"| ReactUI["React 18 Live Dashboard"]
     end
 ```
 
