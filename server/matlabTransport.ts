@@ -24,10 +24,57 @@ export type MatlabFrame = z.infer<typeof matlabFrameSchema> & {
   source: "MATLAB";
 };
 
+import fs from "node:fs";
+import path from "node:path";
+
 const clients = new Set<WebSocket>();
 let latest: MatlabFrame | null = null;
 const matlabHistory: MatlabFrame[] = [];
 const MAX_MATLAB_HISTORY = 300;
+
+// Auto-seed static baseline from mppt_reference_trace.csv if available
+function loadStaticReferenceTrace() {
+  try {
+    const csvPath = path.resolve(process.cwd(), "matlab", "mppt_reference_trace.csv");
+    if (fs.existsSync(csvPath)) {
+      const content = fs.readFileSync(csvPath, "utf-8");
+      const lines = content.trim().split("\n").slice(1); // skip header
+      const step = Math.max(1, Math.floor(lines.length / 60));
+      const now = Date.now();
+      lines.forEach((line, idx) => {
+        if (idx % step === 0 && line.trim()) {
+          const parts = line.split(",").map(Number);
+          if (parts.length >= 5 && !isNaN(parts[3]) && !isNaN(parts[4])) {
+            const timeOffset = parts[0] * 1000;
+            const pEkf = parts[3];
+            const vPv = parts[4];
+            const iPv = vPv > 0 ? pEkf / vPv : 0;
+            const frame: MatlabFrame = {
+              source: "MATLAB",
+              timestampMs: now - (2000 - timeOffset),
+              v_pv: Math.round(vPv * 100) / 100,
+              i_pv: Math.round(iPv * 1000) / 1000,
+              p_pv: Math.round(pEkf * 100) / 100,
+              v_mp: 17.5,
+              i_ph: 0.58,
+              duty: 0.20,
+              v_out: 28.5,
+              t_c: 25.0,
+              efficiency: 99.8,
+              scenarioCode: "STATIC_REF",
+            };
+            matlabHistory.push(frame);
+            latest = frame;
+          }
+        }
+      });
+      console.log(`[MATLAB Transport] Loaded ${matlabHistory.length} static reference frames from mppt_reference_trace.csv`);
+    }
+  } catch (err) {
+    console.warn("[MATLAB Transport] Could not load static reference trace:", err);
+  }
+}
+loadStaticReferenceTrace();
 
 export const matlabWss = new WebSocketServer({ noServer: true });
 
