@@ -103,9 +103,20 @@ fprintf('  Total steps: %d | Time window: 0 to %.2f s\n\n', N_pts, T_sim);
 
 %% 3. MODEL CONFIGURATION & EXECUTION
 
-mdl = gcs;
+mdl = '';
+candidates = {'Zero_Perturb_MPPT_Live', 'Zero_Perturb_MPPT_Build', 'Master_EKF_MPPT_System', 'ekf'};
+
+% Check if a valid non-library model is currently open in Simulink
+try
+    curr = bdroot(gcs);
+    if ~isempty(curr) && ~strcmp(get_param(curr, 'BlockDiagramType'), 'library') && ~strcmp(curr, 'nesl_utility')
+        mdl = curr;
+    end
+catch
+    mdl = '';
+end
+
 if isempty(mdl)
-    candidates = {'Zero_Perturb_MPPT_Live', 'Zero_Perturb_MPPT_Build', 'Master_EKF_MPPT_System', 'ekf'};
     for k = 1:numel(candidates)
         if exist(candidates{k}, 'file') == 4 || bdIsLoaded(candidates{k})
             mdl = candidates{k};
@@ -113,9 +124,10 @@ if isempty(mdl)
         end
     end
     if isempty(mdl), mdl = 'Zero_Perturb_MPPT_Live'; end
-    if ~bdIsLoaded(mdl)
-        load_system(mdl);
-    end
+end
+
+if ~bdIsLoaded(mdl)
+    load_system(mdl);
 end
 
 fprintf('Targeting Simulink model: %s\n', mdl);
