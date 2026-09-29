@@ -40,30 +40,13 @@ export const appRouter = router({
         const frame = demoFrame();
         return { device: null, settings: null, latest: frame, history: [frame], commands: [], scenarios: [] };
       }
-      let history = await listTelemetry(device.id);
-      if (history.length === 0) {
-        const seedFrames = Array.from({ length: 34 }, (_, index) => demoFrame(Date.now() - (33 - index) * 1000));
-        await Promise.all(seedFrames.map((frame) => insertTelemetry({
-          deviceId: device.id,
-          timestampMs: frame.timestampMs,
-          vPv: frame.vPv,
-          iPv: frame.iPv,
-          pPv: frame.pPv,
-          vMp: frame.vMp,
-          iPh: frame.iPh,
-          duty: frame.duty,
-          efficiency: frame.efficiency,
-          source: "DEMO",
-          scenarioCode: "S5",
-        })));
-        history = await listTelemetry(device.id);
-      }
+      const history = await listTelemetry(device.id);
       const [commands, scenarios, settings] = await Promise.all([
         listCommands(device.id),
         listScenarios(),
         getSettings(device.id),
       ]);
-      const latest = history[history.length - 1] ?? demoFrame();
+      const latest = history.length > 0 ? history[history.length - 1] : null;
       return { device, settings, latest, history, commands, scenarios };
     }),
     ingest: publicProcedure.input(z.object({
