@@ -39,7 +39,17 @@ function master_orchestrator(varargin)
     if ~bdIsLoaded(mdl)
         load_system(mdl);
     end
-    open_system(mdl);
+
+    % Suppress and close all Scope popup windows permanently
+    try
+        scopes = find_system(mdl, 'BlockType', 'Scope');
+        for s = 1:numel(scopes)
+            set_param(scopes{s}, 'OpenAtSimulationStart', 'off');
+        end
+        scopeFigs = findall(0, 'Type', 'figure', '-regexp', 'Name', '.*Scope.*');
+        close(scopeFigs);
+    catch
+    end
 
     % Enable smooth simulation pacing
     try
@@ -51,7 +61,7 @@ function master_orchestrator(varargin)
     set_param(mdl, 'Solver', 'ode23t');
     set_param(mdl, 'MaxStep', '1e-3');
 
-    fprintf('   [OK] Model Loaded & Ready.\n\n');
+    fprintf('   [OK] Model Loaded & All Scope Popups Suppressed.\n\n');
 
     %% 3. Start Continuous Live Telemetry Stream Loop
     fprintf('=======================================================\n');
