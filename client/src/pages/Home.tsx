@@ -120,8 +120,37 @@ export default function Home() {
 
     connectMatlabWs();
 
+    // Secondary continuous polling sync (ensures 100% seamless update even if WS blips)
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/telemetry/matlab/latest");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.telemetry) {
+            const frame = normalize(json.telemetry);
+            setTelemetry((prev) => {
+              const last = prev[prev.length - 1];
+              if (!last || last.timestampMs !== frame.timestampMs) {
+                return [...prev.slice(-59), frame];
+              }
+              return prev;
+            });
+            setMatlabFrames((prev) => {
+              const last = prev[prev.length - 1];
+              if (!last || last.timestampMs !== frame.timestampMs) {
+                return [...prev.slice(-59), frame];
+              }
+              return prev;
+            });
+            setHasMatlabData(true);
+          }
+        }
+      } catch {}
+    }, 500);
+
     return () => {
       unmounted = true;
+      clearInterval(pollInterval);
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (matlabSocketRef.current) {
         matlabSocketRef.current.close();
