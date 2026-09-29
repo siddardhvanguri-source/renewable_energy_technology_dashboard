@@ -136,39 +136,12 @@ export function registerMatlabTransport(app: Express, _server?: HttpServer) {
     });
   });
 
-  let activeSetpoint = { irradiance: 1000, temperature: 25, updatedMs: Date.now() };
-
-  app.get("/api/telemetry/setpoint", (_req, res) => {
-    res.json({ ok: true, setpoint: activeSetpoint });
-  });
-
-  app.post("/api/telemetry/setpoint", (req, res) => {
-    const { irradiance, temperature } = req.body ?? {};
-    if (typeof irradiance === "number" && irradiance >= 100 && irradiance <= 1500) {
-      activeSetpoint.irradiance = Math.round(irradiance);
-    }
-    if (typeof temperature === "number" && temperature >= 0 && temperature <= 80) {
-      activeSetpoint.temperature = Math.round(temperature * 10) / 10;
-    }
-    activeSetpoint.updatedMs = Date.now();
-    
-    // Broadcast setpoint change to all connected WebSocket clients
-    const msg = JSON.stringify({ type: "setpoint", setpoint: activeSetpoint });
-    clients.forEach((c) => {
-      if (c.readyState === WebSocket.OPEN) {
-        try { c.send(msg); } catch {}
-      }
-    });
-    
-    res.json({ ok: true, setpoint: activeSetpoint });
-  });
-
   app.get("/api/telemetry/matlab/latest", (_req, res) => {
-    res.json({ ok: true, telemetry: latest, setpoint: activeSetpoint });
+    res.json({ ok: true, telemetry: latest });
   });
 
   app.get("/api/telemetry/matlab/history", (_req, res) => {
-    res.json({ ok: true, count: matlabHistory.length, history: matlabHistory, latest, setpoint: activeSetpoint });
+    res.json({ ok: true, count: matlabHistory.length, history: matlabHistory, latest });
   });
 
   app.get("/api/telemetry/stats", async (_req, res) => {
