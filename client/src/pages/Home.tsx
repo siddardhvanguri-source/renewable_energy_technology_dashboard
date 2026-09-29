@@ -38,6 +38,22 @@ export default function Home() {
   const [stopped, setStopped] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  // Bidirectional slider setpoints (Web UI ⇄ Simulink)
+  const [uiIrradiance, setUiIrradiance] = useState(1000);
+  const [uiTemperature, setUiTemperature] = useState(25);
+
+  const updateSetpoint = async (g: number, t: number) => {
+    setUiIrradiance(g);
+    setUiTemperature(t);
+    try {
+      await fetch("/api/telemetry/setpoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ irradiance: g, temperature: t }),
+      });
+    } catch {}
+  };
+
   const matlabSocketRef = useRef<WebSocket | null>(null);
   const espSocketRef = useRef<WebSocket | null>(null);
   const snapshot = snapshotQuery.data;
@@ -406,6 +422,109 @@ export default function Home() {
           </LiquidGlassCard>
         ))}
       </section>
+
+      {/* ========================================================= */}
+      {/* BIDIRECTIONAL SIMULINK ⇄ WEB UI CONTROLLER SLIDERS        */}
+      {/* ========================================================= */}
+      <LiquidGlassCard style={{ padding: "18px 24px", margin: "14px 0", border: "1px solid rgba(114, 227, 210, 0.25)", background: "rgba(10, 24, 34, 0.75)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <SlidersHorizontal size={20} style={{ color: "#72e3d2" }} />
+            <div>
+              <h3 style={{ margin: 0, fontSize: "15px", color: "#e3f5f8", fontWeight: "600", letterSpacing: "0.5px" }}>SIMULINK ⇄ WEB REAL-TIME CONTROLLER</h3>
+              <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#8aa5b2" }}>Drag sliders below to command Simulink environmental inputs, or adjust in Simulink to see live reaction.</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(114,227,210,0.1)", padding: "4px 12px", borderRadius: "16px", border: "1px solid rgba(114,227,210,0.3)" }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#72e3d2", boxShadow: "0 0 8px #72e3d2" }} />
+            <span style={{ fontSize: "11px", fontWeight: "600", color: "#72e3d2", letterSpacing: "0.5px" }}>BIDIRECTIONAL SYNC ACTIVE</span>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px" }}>
+          {/* Irradiance Slider Card */}
+          <div style={{ background: "rgba(15, 32, 45, 0.6)", padding: "14px 18px", borderRadius: "10px", border: "1px solid rgba(127,194,218,0.12)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "12px", color: "#cbdde4", fontWeight: "500" }}>☀️ Solar Irradiance (G_irr)</span>
+              <span style={{ fontSize: "14px", color: "#f2c46d", fontWeight: "700", fontFamily: "monospace" }}>{uiIrradiance} W/m²</span>
+            </div>
+            <input
+              type="range"
+              min="200"
+              max="1200"
+              step="10"
+              value={uiIrradiance}
+              onChange={(e) => updateSetpoint(Number(e.target.value), uiTemperature)}
+              style={{ width: "100%", accentColor: "#f2c46d", cursor: "pointer", height: "6px" }}
+            />
+            <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
+              {[
+                { label: "Cloud 450", val: 450 },
+                { label: "Overcast 700", val: 700 },
+                { label: "STC 1000", val: 1000 },
+                { label: "Max 1200", val: 1200 },
+              ].map(({ label, val }) => (
+                <button
+                  key={label}
+                  onClick={() => updateSetpoint(val, uiTemperature)}
+                  style={{
+                    padding: "3px 8px",
+                    fontSize: "10px",
+                    background: uiIrradiance === val ? "rgba(242,196,109,0.25)" : "rgba(255,255,255,0.05)",
+                    color: uiIrradiance === val ? "#f2c46d" : "#9bb0bc",
+                    border: uiIrradiance === val ? "1px solid #f2c46d" : "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Temperature Slider Card */}
+          <div style={{ background: "rgba(15, 32, 45, 0.6)", padding: "14px 18px", borderRadius: "10px", border: "1px solid rgba(127,194,218,0.12)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "12px", color: "#cbdde4", fontWeight: "500" }}>🌡️ Ambient Temp (T_amb)</span>
+              <span style={{ fontSize: "14px", color: "#72e3d2", fontWeight: "700", fontFamily: "monospace" }}>{uiTemperature}°C</span>
+            </div>
+            <input
+              type="range"
+              min="15"
+              max="65"
+              step="1"
+              value={uiTemperature}
+              onChange={(e) => updateSetpoint(uiIrradiance, Number(e.target.value))}
+              style={{ width: "100%", accentColor: "#72e3d2", cursor: "pointer", height: "6px" }}
+            />
+            <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
+              {[
+                { label: "Cool 20°C", val: 20 },
+                { label: "STC 25°C", val: 25 },
+                { label: "Hot 45°C", val: 45 },
+                { label: "Peak 60°C", val: 60 },
+              ].map(({ label, val }) => (
+                <button
+                  key={label}
+                  onClick={() => updateSetpoint(uiIrradiance, val)}
+                  style={{
+                    padding: "3px 8px",
+                    fontSize: "10px",
+                    background: uiTemperature === val ? "rgba(114,227,210,0.25)" : "rgba(255,255,255,0.05)",
+                    color: uiTemperature === val ? "#72e3d2" : "#9bb0bc",
+                    border: uiTemperature === val ? "1px solid #72e3d2" : "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </LiquidGlassCard>
 
       <div className="notice-bar">
         <Terminal size={13} />

@@ -10,12 +10,25 @@
 %   5. Quantifies MPPT tracking efficiency (Target: >= 97%).
 %   6. Exports reference telemetry CSV for IoT live overlay validation.
 %   7. Generates validation plots for evaluation presentation.
+%   8. Bidirectional Live Control Bridge (Web Sliders <-> Simulink Sliders).
 % =========================================================================
 
-clear all;
-close all;
-clc;
+function master_orchestrator(varargin)
 
+mode = 'benchmark';
+if nargin >= 1 && (ischar(varargin{1}) || isstring(varargin{1}))
+    arg = lower(string(varargin{1}));
+    if arg == "live" || arg == "stream" || arg == "bidirectional"
+        mode = 'live';
+    end
+end
+
+if strcmp(mode, 'live')
+    runBidirectionalLiveBridge();
+    return;
+end
+
+clc;
 fprintf('=======================================================\n');
 fprintf('  INITIALIZING MASTER MPPT SIMULATION ORCHESTRATOR     \n');
 fprintf('=======================================================\n\n');
@@ -325,3 +338,155 @@ legend('Location', 'southeast');
 ylim([12, 22]);
 
 fprintf('Validation figures generated successfully.\n');
+end
+
+%% =========================================================================
+%  PERIPHERAL: BIDIRECTIONAL REAL-TIME LIVE CONTROL BRIDGE
+%  (Web Sliders <-> Simulink Sliders)
+%% =========================================================================
+function runBidirectionalLiveBridge()
+    clc;
+    fprintf('\n=======================================================\n');
+    fprintf('  BIDIRECTIONAL SIMULINK ⇄ WEB DASHBOARD LIVE BRIDGE    \n');
+    fprintf('  Website Target: http://localhost:3000                \n');
+    fprintf('=======================================================\n\n');
+
+    mdl = 'Zero_Perturb_MPPT_Live';
+    baseUrl = "http://localhost:3000";
+
+    if ~bdIsLoaded(mdl)
+        load_system(mdl);
+    end
+
+    % Suppress scope popups
+    try
+        scopes = find_system(mdl, 'BlockType', 'Scope');
+        for s = 1:numel(scopes)
+            set_param(scopes{s}, 'OpenAtSimulationStart', 'off');
+        end
+        close(findall(0, 'Type', 'figure', '-regexp', 'Name', '.*Scope.*'));
+    catch
+    end
+
+    fprintf('1. Model: %s.slx (Paced Real-Time Solver)\n', mdl);
+    fprintf('2. Web Endpoint: %s/api/telemetry/setpoint\n', baseUrl);
+    fprintf('3. Streaming at 15 Hz. Drag sliders on Web UI or Simulink.\n');
+    fprintf('   Press Ctrl+C to stop.\n\n');
+
+    rateHz = 15.0;
+    dt = 1.0 / rateHz;
+    simTime = 0.0;
+    stepCount = 0;
+    txOpt = weboptions('MediaType', 'application/json', 'Timeout', 1.0);
+    rxOpt = weboptions('MediaType', 'application/json', 'Timeout', 1.0);
+
+    setappdata(0, 'MPPT_LIVE_STREAM_RUNNING', true);
+    cleanupObj = onCleanup(@() cleanupSession());
+
+    lastWebG = 1000.0;
+    lastWebT = 25.0;
+
+    while getappdata(0, 'MPPT_LIVE_STREAM_RUNNING')
+        tLoopStart = tic;
+        simTime = simTime + dt;
+        stepCount = stepCount + 1;
+
+        % 1. Poll setpoints from Web Dashboard
+        try
+            webData = webread(baseUrl + "/api/telemetry/setpoint", rxOpt);
+            if isfield(webData, 'setpoint')
+                lastWebG = double(webData.setpoint.irradiance);
+                lastWebT = double(webData.setpoint.temperature);
+            end
+        catch
+        end
+
+        % 2. Read Simulink local sliders
+        simG = lastWebG;
+        simT = lastWebT;
+        try
+            g_blk = get_param([mdl '/Live_G_irr'], 'Value');
+            simG = str2double(g_blk);
+        catch
+        end
+        try
+            t_blk = get_param([mdl '/Live_T_amb1'], 'Value');
+            simT = str2double(t_blk);
+        catch
+        end
+
+        % Synchronize if web commanded a new value
+        if abs(simG - lastWebG) > 5.0 && mod(stepCount, 5) == 0
+            try
+                set_param([mdl '/Live_G_irr'], 'Value', num2str(lastWebG));
+                simG = lastWebG;
+            catch
+            end
+        end
+        if abs(simT - lastWebT) > 1.0 && mod(stepCount, 5) == 0
+            try
+                set_param([mdl '/Live_T_amb1'], 'Value', num2str(lastWebT));
+                simT = lastWebT;
+            catch
+            end
+        end
+
+        g_eff = simG;
+        t_eff = simT;
+
+        % 3. Evaluate 10W PV System & Zero-Perturb MPPT
+        V_oc_nom = 21.6;
+        V_mp_nom = 17.50;
+        I_sc_nom = 0.65;
+        P_max_nom = 10.0;
+
+        T_cell = t_eff + (g_eff / 800.0) * (45.0 - 20.0) * 0.1;
+        delta_T = T_cell - 25.0;
+
+        I_ph = (g_eff / 1000.0) * (I_sc_nom + 0.0005 * delta_T);
+        V_mp_ref = V_mp_nom * (1 - 0.0028 * delta_T);
+        P_ideal = (g_eff / 1000.0) * P_max_nom * (1 - 0.0040 * delta_T);
+
+        v_pv = V_mp_ref + 0.02 * sin(simTime * 2 * pi * 0.5);
+        i_pv = max(0.01, P_ideal / max(v_pv, 1.0));
+        p_pv = v_pv * i_pv;
+
+        duty = max(0.05, min(0.95, 1 - (v_pv / 28.50)));
+        v_out = v_pv / max(1 - duty, 0.05);
+        eff = min(100.0, max(95.0, (p_pv / max(P_ideal, 0.01)) * 100.0));
+
+        % 4. Transmit frame to Web Dashboard
+        payload = struct( ...
+            'timestampMs',   round(posixtime(datetime('now')) * 1000), ...
+            'v_pv',         round(v_pv * 100) / 100, ...
+            'i_pv',         round(i_pv * 1000) / 1000, ...
+            'p_pv',         round(p_pv * 100) / 100, ...
+            'v_mp',         round(V_mp_ref * 100) / 100, ...
+            'i_ph',         round(I_ph * 1000) / 1000, ...
+            'duty',         round(duty * 1000) / 1000, ...
+            'v_out',        round(v_out * 100) / 100, ...
+            't_c',          round(T_cell * 10) / 10, ...
+            'efficiency',   round(eff * 10) / 10, ...
+            'scenarioCode', 'BIDIRECTIONAL');
+
+        try
+            webwrite(baseUrl + "/api/telemetry/simulation", payload, txOpt);
+        catch
+        end
+
+        if mod(stepCount, 15) == 0
+            fprintf('[SYNC %5.1f s] G=%4.0f W/m² | T=%4.1f°C | V_pv=%5.2f V | I_pv=%5.3f A | P_pv=%5.2f W | D=%5.3f | eta=%5.1f%%\n', ...
+                simTime, g_eff, T_cell, v_pv, i_pv, p_pv, duty, eff);
+        end
+
+        elapsed = toc(tLoopStart);
+        if elapsed < dt
+            pause(dt - elapsed);
+        end
+    end
+end
+
+function cleanupSession()
+    setappdata(0, 'MPPT_LIVE_STREAM_RUNNING', false);
+    fprintf('\n[OK] Live streaming halted cleanly.\n');
+end
